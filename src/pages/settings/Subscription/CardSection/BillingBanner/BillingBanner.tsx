@@ -121,28 +121,28 @@ function BillingBanner({
     ]);
 
     return (
-        <View style={[styles.pv4, styles.ph5, styles.flexRow, styles.flexWrap, styles.gap3, styles.w100, styles.alignItemsCenter, styles.trialBannerBackgroundColor, style]}>
-            <Icon
-                src={icon}
-                width={variables.menuIconSize}
-                height={variables.menuIconSize}
-            />
+        <View style={[styles.pv4, styles.ph5, styles.gap3, styles.w100, styles.trialBannerBackgroundColor, style]}>
+            <View style={[styles.flexRow, styles.flexWrap, styles.gap3, styles.w100, styles.alignItemsCenter]}>
+                <Icon
+                    src={icon}
+                    width={variables.menuIconSize}
+                    height={variables.menuIconSize}
+                />
 
-            <View style={[styles.flex1, styles.justifyContentCenter]}>
-                {typeof title === 'string' ? <Text style={[styles.textStrong, titleStyle]}>{title}</Text> : title}
-                {!!subtitle && (typeof subtitle === 'string' ? <Text style={subtitleStyle}>{subtitle}</Text> : subtitle)}
+                <View style={[styles.flex1, styles.justifyContentCenter]}>
+                    {typeof title === 'string' ? <Text style={[styles.textStrong, titleStyle]}>{title}</Text> : title}
+                    {!!subtitle && (typeof subtitle === 'string' ? <Text style={subtitleStyle}>{subtitle}</Text> : subtitle)}
+                </View>
+                {shouldUseNarrowLayout && !isInLandscapeMode ? (
+                    rightIconComponent
+                ) : (
+                    <>
+                        {!!rightComponent && rightComponent}
+                        {rightIconComponent}
+                    </>
+                )}
             </View>
-            {shouldUseNarrowLayout && !isInLandscapeMode ? (
-                <>
-                    {rightIconComponent}
-                    {!!rightComponent && rightComponent}
-                </>
-            ) : (
-                <>
-                    {!!rightComponent && rightComponent}
-                    {rightIconComponent}
-                </>
-            )}
+            {shouldUseNarrowLayout && !isInLandscapeMode && !!rightComponent && <View style={[styles.flexRow, styles.w100]}>{rightComponent}</View>}
         </View>
     );
 }

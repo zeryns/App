@@ -71,19 +71,6 @@ function AgentPromotionalBanner({title, subtitle, onDismiss, dismissSentryLabel,
         if (!hasCta) {
             return null;
         }
-        if (shouldUseNarrowLayout && !isInLandscapeMode) {
-            return (
-                <View style={[styles.flex0, styles.flexBasis100, styles.maxWidth100Percentage, styles.justifyContentCenter]}>
-                    <Button
-                        success
-                        medium
-                        text={ctaText}
-                        onPress={onCtaPress}
-                        sentryLabel={ctaSentryLabel}
-                    />
-                </View>
-            );
-        }
         return (
             <Button
                 success
@@ -91,9 +78,10 @@ function AgentPromotionalBanner({title, subtitle, onDismiss, dismissSentryLabel,
                 text={ctaText}
                 onPress={onCtaPress}
                 sentryLabel={ctaSentryLabel}
+                style={shouldUseNarrowLayout && !isInLandscapeMode ? styles.w100 : undefined}
             />
         );
-    }, [hasCta, shouldUseNarrowLayout, isInLandscapeMode, ctaText, onCtaPress, ctaSentryLabel, styles]);
+    }, [hasCta, shouldUseNarrowLayout, isInLandscapeMode, ctaText, onCtaPress, ctaSentryLabel, styles.w100]);
 
     return (
         <View style={style}>

@@ -86,9 +86,8 @@ function EarlyDiscountBanner({isSubscriptionPage, onboardingHelpDropdownButton, 
     const shouldDisplayButtonsInSeparateLine = useShouldDisplayButtonsInSeparateLine();
 
     const rightComponent = useMemo(() => {
-        const smallScreenStyle = shouldDisplayButtonsInSeparateLine ? [styles.flex0, styles.flexBasis100, styles.justifyContentCenter] : [];
         return (
-            <View style={[styles.flexRow, styles.gap2, smallScreenStyle, styles.alignItemsCenter]}>
+            <View style={[styles.flexRow, styles.gap2, styles.alignItemsCenter, shouldDisplayButtonsInSeparateLine && styles.w100]}>
                 {onboardingHelpDropdownButton}
                 <Button
                     variant={!hasActiveScheduledCall ? CONST.BUTTON_VARIANT.SUCCESS : undefined}
@@ -103,12 +102,10 @@ function EarlyDiscountBanner({isSubscriptionPage, onboardingHelpDropdownButton, 
     }, [
         shouldDisplayButtonsInSeparateLine,
         hasActiveScheduledCall,
-        styles.flex0,
-        styles.flexBasis100,
-        styles.justifyContentCenter,
         styles.flexRow,
         styles.gap2,
         styles.alignItemsCenter,
+        styles.w100,
         styles.earlyDiscountButton,
         styles.flexGrow2,
         styles.mr2,

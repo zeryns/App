@@ -29,11 +29,11 @@ import {getMovedReportID} from '@libs/ModifiedExpenseMessage';
 import {isTrackOnboardingChoice} from '@libs/OnboardingUtils';
 import {
     getLinkedTransactionID,
+    getOneTransactionThreadReportAction,
     getOneTransactionThreadReportID,
     getOriginalMessage,
     getReportAction,
     isActionOfType,
-    isDeletedAction,
     isMemberChangeAction,
     withDEWRoutedActionsObject,
 } from '@libs/ReportActionsUtils';
@@ -223,28 +223,21 @@ function BaseReportActionContextMenu({
     const parentReportAction = getReportAction(childReport?.parentReportID, childReport?.parentReportActionID);
     const {reportActions: paginatedReportActions} = usePaginatedReportActions(childReport?.reportID);
     const currentUserPersonalDetails = useCurrentUserPersonalDetails();
-    const transactionThreadReportID = useMemo(
-        () => getOneTransactionThreadReportID(childReport, childChatReport, paginatedReportActions ?? [], isOffline),
+    const oneTransactionThreadReportAction = useMemo(
+        () => getOneTransactionThreadReportAction(childReport, childChatReport, paginatedReportActions ?? [], isOffline),
         [paginatedReportActions, isOffline, childReport, childChatReport],
     );
-
-    const [transactionThreadReport] = useOnyx(`${ONYXKEYS.COLLECTION.REPORT}${getNonEmptyStringOnyxID(transactionThreadReportID)}`);
+    const transactionThreadReportID = oneTransactionThreadReportAction ? (oneTransactionThreadReportAction.childReportID ?? CONST.FAKE_REPORT_ID) : undefined;
 
     const isMoneyRequestReport = useMemo(() => ReportUtilsIsMoneyRequestReport(childReport), [childReport]);
     const isInvoiceReport = useMemo(() => ReportUtilsIsInvoiceReport(childReport), [childReport]);
 
     const requestParentReportAction = useMemo(() => {
         if (isMoneyRequestReport || isInvoiceReport) {
-            if (transactionThreadReportID === CONST.FAKE_REPORT_ID) {
-                return Object.values(childReportActions ?? {}).find((action) => action.actionName === CONST.REPORT.ACTIONS.TYPE.IOU && !isDeletedAction(action));
-            }
-            if (!paginatedReportActions || !transactionThreadReport?.parentReportActionID) {
-                return undefined;
-            }
-            return paginatedReportActions.find((action) => action.reportActionID === transactionThreadReport.parentReportActionID);
+            return oneTransactionThreadReportAction;
         }
         return parentReportAction;
-    }, [parentReportAction, isMoneyRequestReport, isInvoiceReport, paginatedReportActions, transactionThreadReport?.parentReportActionID, transactionThreadReportID, childReportActions]);
+    }, [parentReportAction, isMoneyRequestReport, isInvoiceReport, oneTransactionThreadReportAction]);
 
     const moneyRequestAction = transactionThreadReportID ? requestParentReportAction : parentReportAction;
     const isChildReportArchived = useReportIsArchived(childReport?.reportID);

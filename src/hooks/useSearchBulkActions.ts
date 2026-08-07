@@ -5,6 +5,7 @@ import {ModalActions} from '@components/Modal/Global/ModalContext';
 import type {PopoverMenuItem} from '@components/PopoverMenu';
 import {useOpenSearchReportSubmitToPopover} from '@components/ReportSubmitToPopoverAnchor';
 import {useSearchQueryContext, useSearchResultsContext, useSearchSelectionActions, useSearchSelectionContext} from '@components/Search/SearchContext';
+import {useSearchExportDownloadStatus} from '@components/Search/SearchExportDownloadStatusProvider';
 import type {BulkPaySelectionData, PaymentData, SearchColumnType, SearchFilterKey, SearchQueryJSON, SelectedReports, SelectedTransactions} from '@components/Search/types';
 
 import {getExpensifyCardStatementPDF} from '@libs/actions/CompanyCards';
@@ -116,7 +117,6 @@ import useDelegateAccountID from './useDelegateAccountID';
 import useDeleteTransactions from './useDeleteTransactions';
 import useDuplicateTransactionsAndViolations from './useDuplicateTransactionsAndViolations';
 import useEnvironment from './useEnvironment';
-import useExportDownloadStatusModal from './useExportDownloadStatusModal';
 import {useMemoizedLazyExpensifyIcons} from './useLazyAsset';
 import useLocalize from './useLocalize';
 import useNetwork from './useNetwork';
@@ -387,7 +387,7 @@ function useSearchBulkActions({queryJSON}: UseSearchBulkActionsParams) {
     const {selectedTransactions, selectedReports, areAllMatchingItemsSelected} = useSearchSelectionContext();
     const {currentSearchResults} = useSearchResultsContext();
     const {currentSearchKey} = useSearchQueryContext();
-    const {clearSelectedTransactions, selectAllMatchingItems} = useSearchSelectionActions();
+    const {clearSelectedTransactions} = useSearchSelectionActions();
     const currentUserPersonalDetails = useCurrentUserPersonalDetails();
     const {accountID, email, login: currentUserLogin, localCurrencyCode} = currentUserPersonalDetails;
     const delegateAccountID = useDelegateAccountID();
@@ -452,10 +452,7 @@ function useSearchBulkActions({queryJSON}: UseSearchBulkActionsParams) {
     > | null>(null);
 
     const [emptyReportsCount, setEmptyReportsCount] = useState<number>(0);
-    const {trackExport, exportDownloadStatusModal} = useExportDownloadStatusModal(() => {
-        selectAllMatchingItems(false);
-        clearSelectedTransactions(undefined, true);
-    });
+    const {trackExport} = useSearchExportDownloadStatus();
 
     const [dismissedRejectUseExplanation] = useOnyx(ONYXKEYS.NVP_DISMISSED_REJECT_USE_EXPLANATION);
     const [dismissedHoldUseExplanation] = useOnyx(ONYXKEYS.NVP_DISMISSED_HOLD_USE_EXPLANATION);
@@ -2510,7 +2507,6 @@ function useSearchBulkActions({queryJSON}: UseSearchBulkActionsParams) {
         handleExpensifyCardStatementPDFModalHide,
         isExpensifyCardStatementMultiFeedAlertVisible,
         handleExpensifyCardStatementMultiFeedAlertClose,
-        exportDownloadStatusModal,
         dismissModalAndUpdateUseHold,
         dismissRejectModalBasedOnAction,
         isDuplicateOptionVisible,

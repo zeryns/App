@@ -18,6 +18,11 @@ jest.mock('@libs/actions/Export', () => ({
     clearExportDownload: jest.fn(),
 }));
 
+const mockTrackExport = jest.fn();
+jest.mock('@components/Search/SearchExportDownloadStatusProvider', () => ({
+    useSearchExportDownloadStatus: () => ({trackExport: mockTrackExport}),
+}));
+
 jest.mock('@libs/actions/Search', () => ({
     getExportTemplates: jest.fn(() => ({customTemplates: [], defaultTemplates: []})),
     exportSearchItemsToCSV: jest.fn(),
@@ -258,7 +263,7 @@ describe('useSearchBulkActions - CSV export flow', () => {
         });
 
         expect(mockQueueExportSearchItemsToCSV).toHaveBeenCalled();
-        expect(result.current.exportDownloadStatusModal).not.toBeNull();
+        expect(mockTrackExport).toHaveBeenCalledWith('mock-export-id');
     });
 
     it('handleBasicExport with manual selection does not track any export', async () => {
@@ -272,7 +277,7 @@ describe('useSearchBulkActions - CSV export flow', () => {
         });
 
         expect(mockQueueExportSearchItemsToCSV).not.toHaveBeenCalled();
-        expect(result.current.exportDownloadStatusModal).toBeNull();
+        expect(mockTrackExport).not.toHaveBeenCalled();
     });
 
     it('beginExportWithTemplate tracks the export', async () => {
@@ -294,7 +299,7 @@ describe('useSearchBulkActions - CSV export flow', () => {
             });
 
             expect(mockQueueExportSearchWithTemplate).toHaveBeenCalled();
-            expect(result.current.exportDownloadStatusModal).not.toBeNull();
+            expect(mockTrackExport).toHaveBeenCalledWith('mock-template-export-id');
         }
     });
 });

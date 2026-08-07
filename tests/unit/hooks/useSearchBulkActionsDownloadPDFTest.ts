@@ -34,6 +34,11 @@ jest.mock('@libs/actions/CompanyCards', () => ({
     getExpensifyCardStatementPDF: jest.fn(() => Promise.resolve({statementKey: 'statement-key'})),
 }));
 
+const mockTrackExport = jest.fn();
+jest.mock('@components/Search/SearchExportDownloadStatusProvider', () => ({
+    useSearchExportDownloadStatus: () => ({trackExport: mockTrackExport}),
+}));
+
 let mockIsOffline = false;
 jest.mock('@hooks/useNetwork', () => ({
     __esModule: true,
@@ -406,7 +411,7 @@ describe('useSearchBulkActions - Download as PDF', () => {
         });
     });
 
-    it('should call exportReportsToPDF for multi-select and set activeExportID', async () => {
+    it('should call exportReportsToPDF for multi-select and track the export', async () => {
         await Onyx.merge(`${ONYXKEYS.COLLECTION.REPORT}2`, {
             reportID: '2',
             ownerAccountID: CURRENT_USER_ACCOUNT_ID,
@@ -464,7 +469,7 @@ describe('useSearchBulkActions - Download as PDF', () => {
         expect(exportReportsToPDF).toHaveBeenCalledTimes(1);
         expect(exportReportsToPDF).toHaveBeenCalledWith(expect.arrayContaining(['1', '2']));
         expect(exportReportToPDF).not.toHaveBeenCalled();
-        expect(result.current.exportDownloadStatusModal).not.toBeNull();
+        expect(mockTrackExport).toHaveBeenCalledWith('mock-export-id');
     });
 
     it('should show Export as PDF for selected Expensify Card settlement groups', async () => {

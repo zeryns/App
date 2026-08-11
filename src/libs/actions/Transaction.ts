@@ -1129,7 +1129,6 @@ function getChangeTransactionsReportOnyxData({
                 ...(shouldClearAmount && {convertedAmount: null}),
                 ...(shouldClearAmount && {convertedTaxAmount: null}),
                 ...(oldIOUAction ? {linkedTrackedExpenseReportAction: newIOUAction} : {}),
-                errors: null,
             },
         });
 
@@ -1153,7 +1152,6 @@ function getChangeTransactionsReportOnyxData({
                 ...(shouldClearAmount && {pendingAction: transaction.pendingAction ?? null}),
                 ...(shouldClearAmount && {convertedAmount: transaction.convertedAmount}),
                 ...(shouldClearAmount && {convertedTaxAmount: transaction.convertedTaxAmount}),
-                errors: getMicroSecondOnyxErrorWithTranslationKey('iou.error.changeReportMaxTransactionsExceeded'),
             },
         });
 
@@ -1949,6 +1947,19 @@ function getChangeTransactionsReportOnyxData({
                 nextStep: affectedReport.nextStep ?? null,
                 pendingFields: failurePendingFields,
             },
+        });
+    }
+
+    if (destinationReportID && reportID !== CONST.REPORT.UNREPORTED_REPORT_ID && !skippedReportIDsSet.has(destinationReportID)) {
+        optimisticData.push({
+            onyxMethod: Onyx.METHOD.MERGE,
+            key: `${ONYXKEYS.COLLECTION.REPORT}${destinationReportID}`,
+            value: {errorFields: {changeReport: null}},
+        });
+        failureData.push({
+            onyxMethod: Onyx.METHOD.MERGE,
+            key: `${ONYXKEYS.COLLECTION.REPORT}${destinationReportID}`,
+            value: {errorFields: {changeReport: getMicroSecondOnyxErrorWithTranslationKey('iou.error.changeReportMaxTransactionsExceeded')}},
         });
     }
 

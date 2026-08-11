@@ -2759,6 +2759,14 @@ function isOneTransactionReport(report: OnyxEntry<Report>): boolean {
     return report?.transactionCount === 1;
 }
 
+/**
+ * Whether adding `transactionsToAdd` expenses would put the destination report over the backend max.
+ * Used to block Move before we hit a silent ChangeTransactionsReport ExpError.
+ */
+function wouldExceedReportMaxTransactions(report: OnyxEntry<Report>, transactionsToAdd: number): boolean {
+    return (report?.transactionCount ?? 0) + transactionsToAdd > CONST.REPORT.MAX_TRANSACTIONS;
+}
+
 /*
  * Whether the report contains only one expense and the expense should be paid later
  */
@@ -14332,6 +14340,7 @@ export {
     shouldBlockSubmitDueToStrictPolicyRules,
     isWorkspaceChat,
     isOneTransactionReport,
+    wouldExceedReportMaxTransactions,
     isTrackExpenseReportNew,
     shouldHideSingleReportField,
     getBillableAndTaxTotal,

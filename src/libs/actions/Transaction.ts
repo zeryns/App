@@ -13,6 +13,7 @@ import {READ_COMMANDS, WRITE_COMMANDS} from '@libs/API/types';
 import {getCurrencySymbol} from '@libs/CurrencyUtils';
 import DateUtils from '@libs/DateUtils';
 import DistanceRequestUtils from '@libs/DistanceRequestUtils';
+import {getMicroSecondOnyxErrorWithTranslationKey} from '@libs/ErrorUtils';
 import {toLocaleDigit} from '@libs/LocaleDigitUtils';
 import {translateLocal} from '@libs/Localize';
 import {buildOptimisticNextStep} from '@libs/NextStepUtils';
@@ -1128,6 +1129,7 @@ function getChangeTransactionsReportOnyxData({
                 ...(shouldClearAmount && {convertedAmount: null}),
                 ...(shouldClearAmount && {convertedTaxAmount: null}),
                 ...(oldIOUAction ? {linkedTrackedExpenseReportAction: newIOUAction} : {}),
+                errors: null,
             },
         });
 
@@ -1151,6 +1153,7 @@ function getChangeTransactionsReportOnyxData({
                 ...(shouldClearAmount && {pendingAction: transaction.pendingAction ?? null}),
                 ...(shouldClearAmount && {convertedAmount: transaction.convertedAmount}),
                 ...(shouldClearAmount && {convertedTaxAmount: transaction.convertedTaxAmount}),
+                errors: getMicroSecondOnyxErrorWithTranslationKey('iou.error.changeReportMaxTransactionsExceeded'),
             },
         });
 

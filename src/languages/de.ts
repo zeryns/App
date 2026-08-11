@@ -1538,6 +1538,8 @@ const translations: TranslationDeepObject<typeof en> = {
             endDateSameAsStartDate: 'Das Enddatum darf nicht mit dem Startdatum übereinstimmen',
             manySplitsProvided: `Die maximale Anzahl zulässiger Aufteilungen beträgt ${CONST.IOU.SPLITS_LIMIT}.`,
             dateRangeExceedsMaxDays: `Der Datumsbereich darf ${CONST.IOU.SPLITS_LIMIT} Tage nicht überschreiten.`,
+            changeReportMaxTransactionsTitle: 'Moment! Nicht so schnell...',
+            changeReportMaxTransactionsExceeded: `Die maximale Anzahl an Transaktionen pro Bericht beträgt ${CONST.REPORT.MAX_TRANSACTIONS}, und dieser Bericht überschreitet dieses Limit. Bitte verschiebe einige Transaktionen in einen anderen Bericht.`,
             unableToSubmitReport: 'Bericht kann nicht eingereicht werden',
             allTransactionsPendingDescription: 'Sie können diesen Bericht nicht einreichen, weil alle Transaktionen ausstehen. Es kann einige Tage dauern, bis sie gebucht werden.',
             stitchOdometerImagesFailed: 'Kilometerzählerbilder konnten nicht zusammengeführt werden. Bitte versuchen Sie es später noch einmal.',

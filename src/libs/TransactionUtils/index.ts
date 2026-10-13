@@ -1001,6 +1001,25 @@ function isManagedCardTransaction(transaction: OnyxEntry<Pick<Transaction, 'mana
 }
 
 /**
+ * Whether the Reimbursable field can be shown for an expense. Card expenses follow the card feed's stamped forceReimbursable value,
+ * and cash expenses follow the workspace's cash expense default.
+ */
+function isReimbursableAllowedForExpense(transaction: OnyxEntry<Transaction>, policy: OnyxEntry<Policy>, isReimbursableDifferentFromPolicyDefault: boolean): boolean {
+    if (isManagedCardTransaction(transaction)) {
+        if (isExpensifyCardTransaction(transaction)) {
+            return false;
+        }
+        const forceReimbursable = transaction?.comment?.forceReimbursable;
+        return (
+            forceReimbursable === CONST.TRANSACTION.FORCE_REIMBURSABLE.DEFAULT_YES ||
+            forceReimbursable === CONST.TRANSACTION.FORCE_REIMBURSABLE.DEFAULT_NO ||
+            forceReimbursable === CONST.TRANSACTION.FORCE_REIMBURSABLE.NONE
+        );
+    }
+    return policy?.disabledFields?.reimbursable !== true || isReimbursableDifferentFromPolicyDefault;
+}
+
+/**
  * Determine whether a transaction is imported from a credit card.
  * This includes managed cards (Expensify/Company cards) and personal cards imported via bank connection.
  */
@@ -1877,6 +1896,7 @@ export {
     hasPendingDistanceReceiptRegeneration,
     isExpensifyCardTransaction,
     isManagedCardTransaction,
+    isReimbursableAllowedForExpense,
     isDuplicate,
     isPending,
     hasOnlyPendingCardTransactions,

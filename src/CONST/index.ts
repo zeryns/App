@@ -2777,6 +2777,13 @@ const CONST = {
             RESTRICT: 'corporate',
             ALLOW: 'personal',
         },
+        FORCE_REIMBURSABLE: {
+            FORCE_NO: 'force_no',
+            FORCE_YES: 'force_yes',
+            DEFAULT_YES: 'default_yes',
+            DEFAULT_NO: 'default_no',
+            NONE: 'none',
+        },
     },
     TIME_TRACKING: {
         UNIT: {

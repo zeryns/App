@@ -34,6 +34,7 @@ import {
     hasSplitExpenseInSelection,
     isDistanceRequest,
     isManagedCardTransaction,
+    isReimbursableAllowedForExpense,
     isPerDiemRequest,
     isTimeRequest,
 } from '@libs/TransactionUtils';
@@ -151,11 +152,15 @@ function SearchEditMultiplePage() {
     });
 
     const areSelectedTransactionsReimbursable = selectedTransactionContexts.every(({transaction, report, transactionPolicy}) => {
+        // Card expenses follow their stamped feed setting, whether or not they're on a report
+        if (isManagedCardTransaction(transaction)) {
+            return !isIOUReport(report) && !isInvoiceReport(report) && isReimbursableAllowedForExpense(transaction, transactionPolicy, false);
+        }
         // Unreported expenses have no policy yet but reimbursable is always applicable
         if (!transaction.reportID || transaction.reportID === CONST.REPORT.UNREPORTED_REPORT_ID) {
             return true;
         }
-        return !isIOUReport(report) && !isInvoiceReport(report) && transactionPolicy?.disabledFields?.reimbursable === false && !isManagedCardTransaction(transaction);
+        return !isIOUReport(report) && !isInvoiceReport(report) && transactionPolicy?.disabledFields?.reimbursable === false;
     });
 
     const policyID = getSearchBulkEditPolicyID(selectedTransactionIDs, activePolicyID, mergedTransactions, mergedReports);

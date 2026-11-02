@@ -3361,19 +3361,7 @@ function markCommentAsUnread(reportID: string | undefined, reportActions: OnyxEn
         return;
     }
 
-    // Find the latest report actions from other users
-    const latestReportActionFromOtherUsers = Object.values(reportActions ?? {}).reduce((latest: ReportAction | null, current: ReportAction) => {
-        if (
-            !ReportActionsUtils.isDeletedAction(current) &&
-            current.actorAccountID !== currentUserAccountID &&
-            (!latest || current.created > latest.created) &&
-            // Whisper action doesn't affect lastVisibleActionCreated, so skip whisper action except actionable mention whisper
-            (!ReportActionsUtils.isWhisperAction(current) || current.actionName === CONST.REPORT.ACTIONS.TYPE.ACTIONABLE_MENTION_WHISPER)
-        ) {
-            return current;
-        }
-        return latest;
-    }, null);
+    const latestReportActionFromOtherUsers = ReportActionsUtils.getLatestReportActionFromOtherUsers(reportActions, currentUserAccountID);
 
     const report = allReports?.[`${ONYXKEYS.COLLECTION.REPORT}${reportID}`];
     const chatReport = allReports?.[`${ONYXKEYS.COLLECTION.REPORT}${report?.chatReportID}`];
@@ -3446,7 +3434,9 @@ function markCommentAsUnread(reportID: string | undefined, reportActions: OnyxEn
         },
     ];
 
-    const reportActionID = reportAction?.reportActionID ?? latestReportActionFromOtherUsers?.reportActionID;
+    // The server stores the given action's created time minus 1ms, not the lastReadTime we send, and that's what other devices
+    // receive. So only send an action whose time we picked. Without one, the server keeps our lastReadTime.
+    const reportActionID = [reportAction, latestReportActionFromOtherUsers].find((action) => !!action?.created && action.created === actionCreationTime)?.reportActionID;
 
     const parameters: MarkAsUnreadParams = {
         reportID,

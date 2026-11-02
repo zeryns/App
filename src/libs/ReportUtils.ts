@@ -190,6 +190,7 @@ import {
     formatLastMessageText,
     getActionableJoinRequestPendingReportAction,
     getAllReportActions,
+    getLatestReportActionFromOtherUsers,
     getCrossBorderReimbursedMessage,
     getElsewherePaymentReportActionMessage,
     getIOUActionForTransactionID,
@@ -10795,8 +10796,16 @@ function isUnread(report: OnyxEntry<Report>, oneTransactionThreadReport: OnyxEnt
     const drivingActorAccountID =
         (oneTransactionThreadReport?.lastVisibleActionCreated ?? '') > (report?.lastVisibleActionCreated ?? '') ? oneTransactionThreadReport?.lastActorAccountID : report?.lastActorAccountID;
 
+    // The current user's own newest action doesn't make the report unread. Mark as unread does, but only on the device that
+    // marks it, which also stores the newest action from someone else as the last actor. Other devices only receive
+    // lastReadTime, so they check for that same action and the place the mark puts lastReadTime: right before that action,
+    // or 1ms before the newest action.
     if (isUnreadFromTimestamp && drivingActorAccountID === deprecatedCurrentUserAccountID && !(lastReadTime < lastMentionedTime)) {
-        return false;
+        const latestReportActionFromOtherUsers = getLatestReportActionFromOtherUsers(getAllReportActions(report.reportID), deprecatedCurrentUserAccountID);
+        return (
+            !!latestReportActionFromOtherUsers?.actorAccountID &&
+            (latestReportActionFromOtherUsers.created > lastReadTime || lastReadTime === DateUtils.subtractMillisecondsFromDateTime(lastVisibleActionCreated, 1))
+        );
     }
 
     return isUnreadFromTimestamp;

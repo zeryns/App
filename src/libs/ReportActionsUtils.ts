@@ -3195,6 +3195,25 @@ function getActionableMentionWhisperMessage(
 }
 
 /**
+ * Gets the newest action written by someone other than the current user. Mark as unread puts lastReadTime right before it,
+ * and `isUnread` uses it to tell that mark apart from a report whose newest action is the current user's own.
+ */
+function getLatestReportActionFromOtherUsers(reportActions: OnyxEntry<ReportActions>, currentUserAccountID: number | undefined): ReportAction | null {
+    return Object.values(reportActions ?? {}).reduce((latest: ReportAction | null, current: ReportAction) => {
+        if (
+            !isDeletedAction(current) &&
+            current.actorAccountID !== currentUserAccountID &&
+            (!latest || current.created > latest.created) &&
+            // Whisper action doesn't affect lastVisibleActionCreated, so skip whisper action except actionable mention whisper
+            (!isWhisperAction(current) || current.actionName === CONST.REPORT.ACTIONS.TYPE.ACTIONABLE_MENTION_WHISPER)
+        ) {
+            return current;
+        }
+        return latest;
+    }, null);
+}
+
+/**
  * Note: Prefer `ReportActionsUtils.isCurrentActionUnread` over this method, if applicable.
  * Check whether a specific report action is unread.
  */
@@ -6064,6 +6083,7 @@ export {
     extractLinksFromMessageHtml,
     formatLastMessageText,
     isReportActionUnread,
+    getLatestReportActionFromOtherUsers,
     getHtmlWithAttachmentID,
     getActionableMentionWhisperMessage,
     getAgentPromptUpdatedMessage,

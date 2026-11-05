@@ -14,6 +14,7 @@ import {getIOUActionForTransactionID, isActionableTrackExpense, isMoneyRequestAc
 import {isArchivedReport, isExpenseReport, isInvoiceReport, isIOUReport, isSelfDM} from '@libs/ReportUtils';
 import type {SearchGroupKey} from '@libs/SearchUIUtils';
 import {getActiveGroupSearchHashes} from '@libs/SearchUIUtils';
+import {getFrozenSplitTransactionIDs} from '@libs/SplitExpenseUtils';
 import {
     getChildTransactions,
     getOriginalTransactionWithSplitInfo,
@@ -129,8 +130,31 @@ function useDeleteTransactions({report, reportActions, policy}: UseDeleteTransac
 
         const originalTransaction = allTransactions?.[`${ONYXKEYS.COLLECTION.TRANSACTION}${transaction.comment?.originalTransactionID}`];
         const isSelfDMSplit = isSelfDM(report) || (!!selfDMReportID && transaction.reportID === CONST.REPORT.UNREPORTED_REPORT_ID);
-        const hasMultipleSplits = getChildTransactions(allTransactions, originalTransaction?.transactionID).length > 1;
+        const childTransactions = getChildTransactions(allTransactions, originalTransaction?.transactionID);
+        const hasMultipleSplits = childTransactions.length > 1;
         if (!shouldRedirectDeleteToSplitExpenseEdit(transaction, originalTransaction, isSelfDMSplit) || (!hasMultipleSplits && isPerDiemRequestTransactionUtils(originalTransaction))) {
+            return undefined;
+        }
+
+        const otherSplits = childTransactions
+            .filter((child) => child?.transactionID !== transaction.transactionID)
+            .map((child) => ({transactionID: child?.transactionID ?? String(CONST.DEFAULT_NUMBER_ID), reportID: child?.reportID}));
+        const frozenSplitTransactionIDs = getFrozenSplitTransactionIDs({
+            splitExpenses: otherSplits,
+            allTransactions,
+            allReports,
+            fallbackReport: allReports?.[`${ONYXKEYS.COLLECTION.REPORT}${selfDMReportID}`] ?? report,
+            searchResultsData: undefined,
+            originalTransaction,
+            currentUserLogin: currentUserPersonalDetails.login ?? '',
+            currentUserAccountID: currentUserPersonalDetails.accountID,
+            rules,
+            personalDetails,
+            allPolicies,
+            parentReport: allReports?.[`${ONYXKEYS.COLLECTION.REPORT}${report?.parentReportID}`],
+        });
+
+        if (otherSplits.every((split) => frozenSplitTransactionIDs.has(split.transactionID))) {
             return undefined;
         }
 

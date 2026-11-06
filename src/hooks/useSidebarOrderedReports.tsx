@@ -130,7 +130,7 @@ function SidebarOrderedReportsContextProvider({
     const reportAttributes = useReportAttributes();
     const prevReportAttributes = usePrevious(reportAttributes);
     const reportAttributesUpdates = useMemo(() => getReportAttributesUpdates(reportAttributes, prevReportAttributes), [reportAttributes, prevReportAttributes]);
-    const [currentReportsToDisplay, setCurrentReportsToDisplay] = useState<ReportsToDisplayInLHN>({});
+    const currentReportsToDisplayRef = useRef<ReportsToDisplayInLHN>({});
     const {shouldUseNarrowLayout} = useResponsiveLayout();
     const {isOffline} = useNetwork();
     const {accountID, login: currentUserLogin} = useCurrentUserPersonalDetails();
@@ -255,6 +255,8 @@ function SidebarOrderedReportsContextProvider({
     ]);
 
     const reportsToDisplayInLHN = useMemo(() => {
+        // eslint-disable-next-line react-hooks/refs -- the ref holds the last committed map and is only written in an effect
+        const currentReportsToDisplay = currentReportsToDisplayRef.current;
         const updatedReports = getUpdatedReports();
         const hasCachedReports = Object.keys(currentReportsToDisplay).length > 0;
 
@@ -271,11 +273,9 @@ function SidebarOrderedReportsContextProvider({
         const shouldDoIncrementalUpdate = effectiveUpdatedReports.length > 0 && hasCachedReports;
         let reportsToDisplay: ReportsToDisplayInLHN = {};
         if (shouldDoIncrementalUpdate) {
-            reportsToDisplay = SidebarUtils.updateReportsToDisplayInLHN({
-                displayedReports: currentReportsToDisplay,
+            const updateParams = {
                 reports: chatReports,
                 policies: allPolicies,
-                updatedReportsKeys: effectiveUpdatedReports,
                 currentReportId: derivedCurrentReportID,
                 isInFocusMode: priorityMode === CONST.PRIORITY_MODE.GSD,
                 isDefaultRoomsBetaEnabled,
@@ -291,7 +291,13 @@ function SidebarOrderedReportsContextProvider({
                 conciergeReportID,
                 guideAccountIDs,
                 session,
-            });
+            };
+            reportsToDisplay = SidebarUtils.updateReportsToDisplayInLHN({...updateParams, displayedReports: currentReportsToDisplay, updatedReportsKeys: effectiveUpdatedReports});
+
+            // A displayed row can depend on the report that just changed, so recheck the displayed rows in this same render.
+            if (updatedReports.length > 0 && reportsToDisplay !== currentReportsToDisplay) {
+                reportsToDisplay = SidebarUtils.updateReportsToDisplayInLHN({...updateParams, displayedReports: reportsToDisplay, updatedReportsKeys: Object.keys(reportsToDisplay)});
+            }
         } else {
             Log.info('[useSidebarOrderedReports] building reportsToDisplay from scratch');
             reportsToDisplay = SidebarUtils.getReportsToDisplayInLHN({
@@ -316,7 +322,7 @@ function SidebarOrderedReportsContextProvider({
         }
 
         return reportsToDisplay;
-        // Rule disabled intentionally — triggering a re-render on currentReportsToDisplay would cause an infinite loop
+        // Rule disabled intentionally — report inputs are tracked through getUpdatedReports, and currentReportsToDisplayRef is only a cache of the last committed result
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         getUpdatedReports,
@@ -362,7 +368,7 @@ function SidebarOrderedReportsContextProvider({
     }, [reportsDrafts]);
 
     useEffect(() => {
-        setCurrentReportsToDisplay(reportsToDisplayInLHN);
+        currentReportsToDisplayRef.current = reportsToDisplayInLHN;
     }, [reportsToDisplayInLHN]);
 
     const getOrderedReportIDs = useCallback(
@@ -416,7 +422,7 @@ function SidebarOrderedReportsContextProvider({
 
     const clearLHNCache = useCallback(() => {
         Log.info('[useSidebarOrderedReports] Clearing sidebar cache manually via debug modal');
-        setCurrentReportsToDisplay({});
+        currentReportsToDisplayRef.current = {};
         setClearCacheDummyCounter((current) => current + 1);
     }, []);
 

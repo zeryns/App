@@ -1,4 +1,5 @@
 import FullPageNotFoundView from '@components/BlockingViews/FullPageNotFoundView';
+import FullscreenLoadingIndicator from '@components/FullscreenLoadingIndicator';
 import HeaderWithBackButton from '@components/HeaderWithBackButton';
 import Icon from '@components/Icon';
 import {ImageBehaviorContextProvider} from '@components/Image/ImageBehaviorContextProvider';
@@ -9,6 +10,7 @@ import ScreenWrapper from '@components/ScreenWrapper';
 import {useCurrencyListActions} from '@hooks/useCurrencyList';
 import useDelegateAccountID from '@hooks/useDelegateAccountID';
 import useDynamicBackPath from '@hooks/useDynamicBackPath';
+import {useIsReportLoadPending} from '@hooks/useInFlightRequests';
 import {useMemoizedLazyExpensifyIcons} from '@hooks/useLazyAsset';
 import useLocalize from '@hooks/useLocalize';
 import useOnyx from '@hooks/useOnyx';
@@ -67,6 +69,9 @@ function DynamicSplitBillDetailsPage({report, reportAction}: SplitBillDetailsPag
 
     const [transaction] = useOnyx(`${ONYXKEYS.COLLECTION.TRANSACTION}${getNonEmptyStringOnyxID(IOUTransactionID)}`);
     const [draftTransaction] = useOnyx(`${ONYXKEYS.COLLECTION.SPLIT_TRANSACTION_DRAFT}${IOUTransactionID}`);
+    const [isLoadingApp] = useOnyx(ONYXKEYS.IS_LOADING_APP);
+    const isReportLoadPending = useIsReportLoadPending(reportID);
+    const isLoadingSplitTransaction = !!IOUTransactionID && isEmptyObject(transaction) && (!!isLoadingApp || isReportLoadPending);
     const [personalDetails] = useAllPersonalDetails();
     const [transactionReport] = useOnyx(`${ONYXKEYS.COLLECTION.REPORT}${transaction?.reportID}`);
     const [quickAction] = useOnyx(ONYXKEYS.NVP_QUICK_ACTION_GLOBAL_CREATE);
@@ -159,6 +164,10 @@ function DynamicSplitBillDetailsPage({report, reportAction}: SplitBillDetailsPag
         cleanupAfterExpenseCreate({draftTransactionIDs: [CONST.IOU.OPTIMISTIC_TRANSACTION_ID], shouldWaitForUpcomingTransition: true});
         dismissModalAndOpenReportInInboxTab(reportID, undefined, chatReportTransactions.length > 0);
     };
+
+    if (isLoadingSplitTransaction) {
+        return <FullscreenLoadingIndicator />;
+    }
 
     return (
         <ScreenWrapper testID="DynamicSplitBillDetailsPage">

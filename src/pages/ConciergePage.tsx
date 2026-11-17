@@ -24,6 +24,7 @@ import {useFocusEffect} from '@react-navigation/native';
 import {isActingAsDelegateSelector} from '@selectors/Account';
 import {isSingleNewDotEntrySelector} from '@selectors/HybridApp';
 import {guidedSetupAndTourStatusSelector, tryNewDotOnyxSelector, wasInvitedToNewDotSelector} from '@selectors/Onboarding';
+import {hasJoinedWorkspaceOutsideOnboarding} from '@selectors/Policy';
 import {isSupportalSessionSelector} from '@selectors/Session';
 import React, {useCallback, useEffect, useRef} from 'react';
 import {View} from 'react-native';
@@ -53,6 +54,10 @@ function ConciergePage() {
     const hasCompletedGuidedSetupFlow = guidedSetupAndTourStatus?.hasCompletedGuidedSetupFlow;
     const delegateAccountID = useDelegateAccountID();
     const [hasNonPersonalPolicy] = useOnyx(ONYXKEYS.HAS_NON_PERSONAL_POLICY);
+    const [onboardingPolicyID] = useOnyx(ONYXKEYS.ONBOARDING_POLICY_ID);
+    const [hasJoinedWorkspace] = useOnyx(ONYXKEYS.COLLECTION.POLICY, {
+        selector: (policies) => hasJoinedWorkspaceOutsideOnboarding(policies, session?.accountID, onboardingPolicyID),
+    });
     const [isMigratedUser] = useOnyx(ONYXKEYS.NVP_TRY_NEW_DOT, {selector: isMigratedUserSelector});
     const [isActingAsDelegate] = useOnyx(ONYXKEYS.ACCOUNT, {selector: isActingAsDelegateSelector});
     const [isSingleNewDotEntry] = useOnyx(ONYXKEYS.HYBRID_APP, {selector: isSingleNewDotEntrySelector});
@@ -60,6 +65,7 @@ function ConciergePage() {
     // The accounts useOnboardingFlow never sends to onboarding, so their flag can stay false for good.
     const isOnboardingSkipped =
         !!hasNonPersonalPolicy ||
+        !!hasJoinedWorkspace ||
         !!wasInvitedToNewDotSelector(introSelected) ||
         !!isMigratedUser ||
         isSupportalSessionSelector(session) ||

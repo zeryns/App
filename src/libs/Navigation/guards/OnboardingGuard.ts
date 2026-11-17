@@ -1,8 +1,9 @@
 import AccountUtils from '@libs/AccountUtils';
-import {setOnboardingErrorMessage} from '@libs/actions/Welcome';
+import {isServerDataReady, setOnboardingErrorMessage} from '@libs/actions/Welcome';
 import Log from '@libs/Log';
 import {isOnboardingFlowName} from '@libs/Navigation/helpers/isNavigatorName';
 import {getDeepestFocusedScreen, isTwoFactorSetupScreen} from '@libs/Navigation/Navigation';
+import {getIsOffline} from '@libs/NetworkState';
 
 import {getOnboardingInitialPath} from '@userActions/Welcome/OnboardingFlow';
 
@@ -13,16 +14,17 @@ import ONYXKEYS from '@src/ONYXKEYS';
 import type {Route} from '@src/ROUTES';
 import ROUTES from '@src/ROUTES';
 import SCREENS from '@src/SCREENS';
-import type {Account, Onboarding} from '@src/types/onyx';
+import type {Account, Onboarding, Policy} from '@src/types/onyx';
 
 import type {NavigationAction, NavigationState} from '@react-navigation/native';
-import type {OnyxEntry} from 'react-native-onyx';
+import type {OnyxCollection, OnyxEntry} from 'react-native-onyx';
 import type {ValueOf} from 'type-fest';
 
 import {findFocusedRoute} from '@react-navigation/native';
 import {isActingAsDelegateSelector} from '@selectors/Account';
 import {isSingleNewDotEntrySelector} from '@selectors/HybridApp';
 import {hasCompletedGuidedSetupFlowSelector, tryNewDotOnyxSelector, wasInvitedToNewDotSelector} from '@selectors/Onboarding';
+import {hasJoinedWorkspaceOutsideOnboarding} from '@selectors/Policy';
 import Onyx from 'react-native-onyx';
 
 import type {GuardResult, NavigationGuard} from './types';
@@ -45,6 +47,9 @@ let onboardingCompanySize: OnyxEntry<OnboardingCompanySize>;
 let onboardingInitialPath: OnyxEntry<string>;
 let hasNonPersonalPolicy: OnyxEntry<boolean>;
 let wasInvitedToNewDot: boolean | undefined;
+let allPolicies: OnyxCollection<Policy>;
+let currentUserAccountID: number | undefined;
+let onboardingPolicyID: OnyxEntry<string>;
 
 Onyx.connectWithoutView({
     key: ONYXKEYS.NVP_ONBOARDING,
@@ -106,6 +111,27 @@ Onyx.connectWithoutView({
     key: ONYXKEYS.NVP_INTRO_SELECTED,
     callback: (value) => {
         wasInvitedToNewDot = value ? wasInvitedToNewDotSelector(value) : undefined;
+    },
+});
+
+Onyx.connectWithoutView({
+    key: ONYXKEYS.COLLECTION.POLICY,
+    callback: (value) => {
+        allPolicies = value;
+    },
+});
+
+Onyx.connectWithoutView({
+    key: ONYXKEYS.SESSION,
+    callback: (value) => {
+        currentUserAccountID = value?.accountID;
+    },
+});
+
+Onyx.connectWithoutView({
+    key: ONYXKEYS.ONBOARDING_POLICY_ID,
+    callback: (value) => {
+        onboardingPolicyID = value;
     },
 });
 
@@ -266,7 +292,7 @@ const OnboardingGuard: NavigationGuard = {
         const isMigratedUser = tryNewDot?.hasBeenAddedToNudgeMigration ?? false;
         const isSingleEntry = hybridApp?.isSingleNewDotEntry ?? false;
         const isFirstTimeHybridAppTransition = (CONFIG.IS_HYBRID_APP && tryNewDot?.isHybridAppOnboardingCompleted !== true) ?? false;
-        const isInvitedOrGroupMember = (hasNonPersonalPolicy || wasInvitedToNewDot) ?? false;
+        const isInvitedOrGroupMember = (hasNonPersonalPolicy || wasInvitedToNewDot || hasJoinedWorkspaceOutsideOnboarding(allPolicies, currentUserAccountID, onboardingPolicyID)) ?? false;
 
         const isNavigatingToJoinWorkspaceTaskRoute = isNavigatingToJoinWorkspaceTask(action);
 
@@ -332,6 +358,12 @@ const OnboardingGuard: NavigationGuard = {
             if (isNavigatingAwayFromOnboardingFlow(action)) {
                 return {type: 'BLOCK', reason: 'Cannot navigate away from onboarding before it is completed'};
             }
+            return {type: 'ALLOW'};
+        }
+
+        // A reopened app sends ReconnectApp, which leaves IS_LOADING_APP false, so wait here for this session's data before
+        // pushing the user into onboarding from the cache of the previous session. Offline, the cache is all we will get.
+        if (!isServerDataReady() && !getIsOffline()) {
             return {type: 'ALLOW'};
         }
 

@@ -35,7 +35,8 @@ import type {Route} from '@src/ROUTES';
 import ROUTES from '@src/ROUTES';
 import SCREENS from '@src/SCREENS';
 import {hasCompletedGuidedSetupFlowSelector, wasInvitedToNewDotSelector} from '@src/selectors/Onboarding';
-import type {IntroSelected, PersonalDetailsList, Report, ReportNameValuePairs, Session} from '@src/types/onyx';
+import {hasJoinedWorkspaceOutsideOnboarding} from '@src/selectors/Policy';
+import type {IntroSelected, PersonalDetailsList, Policy, Report, ReportNameValuePairs, Session} from '@src/types/onyx';
 
 import type {Connection, OnyxCollection, OnyxEntry, OnyxValue} from 'react-native-onyx';
 
@@ -550,6 +551,9 @@ function openReportFromDeepLink(
         let latestOnboarding: OnyxValue<typeof ONYXKEYS.NVP_ONBOARDING>;
         let hasNonPersonalPolicy = false;
         let wasInvitedToNewDot = false;
+        let hasJoinedWorkspace = false;
+        let allPolicies: OnyxCollection<Policy>;
+        let onboardingPolicyID: OnyxEntry<string>;
         let isPending = true;
         let isActive = true;
         const connections: Connection[] = [];
@@ -603,7 +607,7 @@ function openReportFromDeepLink(
                     const currentFocusedRoute = findFocusedRoute(state);
                     const isOnboardingOpen = state.routes.some((stateRoute) => stateRoute.name === NAVIGATORS.ONBOARDING_MODAL_NAVIGATOR) || isOnboardingFlowName(currentFocusedRoute?.name);
                     // Invited users and workspace members skip onboarding, but an open flow must keep control until it finishes.
-                    const shouldSkipOnboarding = (hasNonPersonalPolicy || wasInvitedToNewDot) && !isOnboardingOpen;
+                    const shouldSkipOnboarding = (hasNonPersonalPolicy || wasInvitedToNewDot || hasJoinedWorkspace) && !isOnboardingOpen;
 
                     const handleDeeplinkNavigation = () => {
                         // Stop re-evaluating onboarding, but keep later loading and report waiters cancellable until navigation finishes.
@@ -788,6 +792,29 @@ function openReportFromDeepLink(
                 callback: (value) => {
                     wasInvitedToNewDot = wasInvitedToNewDotSelector(value) ?? false;
                     onboardingSubscription.callback(latestOnboarding);
+                },
+            }),
+        );
+        // ReconnectApp delivers a workspace the user was added to without refreshing HAS_NON_PERSONAL_POLICY.
+        const updateHasJoinedWorkspace = () => {
+            hasJoinedWorkspace = hasJoinedWorkspaceOutsideOnboarding(allPolicies, currentUserAccountID, onboardingPolicyID);
+            onboardingSubscription.callback(latestOnboarding);
+        };
+        connections.push(
+            Onyx.connectWithoutView({
+                key: ONYXKEYS.ONBOARDING_POLICY_ID,
+                callback: (value) => {
+                    onboardingPolicyID = value;
+                    updateHasJoinedWorkspace();
+                },
+            }),
+        );
+        connections.push(
+            Onyx.connectWithoutView({
+                key: ONYXKEYS.COLLECTION.POLICY,
+                callback: (value) => {
+                    allPolicies = value;
+                    updateHasJoinedWorkspace();
                 },
             }),
         );

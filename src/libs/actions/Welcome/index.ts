@@ -45,6 +45,13 @@ function onServerDataReady(): Promise<void> {
 }
 
 /**
+ * Synchronous form of onServerDataReady for code that cannot wait, such as navigation guards.
+ */
+function isServerDataReady(): boolean {
+    return hasStartedLoading && !isLoadingReportData;
+}
+
+/**
  * Check if report data are loaded
  */
 function checkServerDataReady() {
@@ -308,6 +315,7 @@ function dismissProductTraining(elementName: string, isDismissedUsingCloseButton
 
 export {
     onServerDataReady,
+    isServerDataReady,
     dismissProductTraining,
     setOnboardingPurposeSelected,
     updateOnboardingLastVisitedPath,

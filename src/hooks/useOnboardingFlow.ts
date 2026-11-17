@@ -7,7 +7,7 @@ import TransitionTracker from '@libs/Navigation/TransitionTracker';
 import {isLoggingInAsNewUser} from '@libs/SessionUtils';
 import {hasSecureLinkKey} from '@libs/Url';
 
-import {completeHybridAppOnboarding} from '@userActions/Welcome';
+import {completeHybridAppOnboarding, isServerDataReady as getIsServerDataReady, onServerDataReady} from '@userActions/Welcome';
 import {buildOnboardingFlowParams, startOnboardingFlow} from '@userActions/Welcome/OnboardingFlow';
 
 import CONFIG from '@src/CONFIG';
@@ -17,9 +17,11 @@ import isLoadingOnyxValue from '@src/types/utils/isLoadingOnyxValue';
 
 import {isSingleNewDotEntrySelector} from '@selectors/HybridApp';
 import {hasCompletedGuidedSetupFlowSelector, tryNewDotOnyxSelector, wasInvitedToNewDotSelector} from '@selectors/Onboarding';
-import {emailSelector} from '@selectors/Session';
-import {useEffect} from 'react';
+import {hasJoinedWorkspaceOutsideOnboarding} from '@selectors/Policy';
+import {accountIDSelector, emailSelector} from '@selectors/Session';
+import {useEffect, useState} from 'react';
 
+import useNetwork from './useNetwork';
 import useOnyx from './useOnyx';
 import useRootNavigationState from './useRootNavigationState';
 import useShouldSuppressPromotionalUI from './useShouldSuppressPromotionalUI';
@@ -59,6 +61,26 @@ function useOnboardingFlowRouter() {
     const [hasNonPersonalPolicy] = useOnyx(ONYXKEYS.HAS_NON_PERSONAL_POLICY);
     const [introSelected] = useOnyx(ONYXKEYS.NVP_INTRO_SELECTED);
     const wasInvitedToNewDot = wasInvitedToNewDotSelector(introSelected);
+    const [currentUserAccountID] = useOnyx(ONYXKEYS.SESSION, {selector: accountIDSelector});
+    const [onboardingPolicyID] = useOnyx(ONYXKEYS.ONBOARDING_POLICY_ID);
+    const [hasJoinedWorkspace = false] = useOnyx(ONYXKEYS.COLLECTION.POLICY, {
+        selector: (policies) => hasJoinedWorkspaceOutsideOnboarding(policies, currentUserAccountID, onboardingPolicyID),
+    });
+    const {isOffline} = useNetwork();
+    const [isServerDataReady, setIsServerDataReady] = useState(getIsServerDataReady);
+
+    useEffect(() => {
+        let isActive = true;
+        onServerDataReady().then(() => {
+            if (!isActive) {
+                return;
+            }
+            setIsServerDataReady(true);
+        });
+        return () => {
+            isActive = false;
+        };
+    }, []);
 
     const [isSingleNewDotEntry, isSingleNewDotEntryMetadata] = useOnyx(ONYXKEYS.HYBRID_APP, {selector: isSingleNewDotEntrySelector});
 
@@ -112,8 +134,14 @@ function useOnboardingFlowRouter() {
                     }
                 }
 
+                // A reopened app sends ReconnectApp, which leaves IS_LOADING_APP false, so wait for this session's membership data
+                // before deciding. Offline, the cache is all we will get.
+                if (!isServerDataReady && !isOffline) {
+                    return;
+                }
+
                 const isMigratedUser = hasBeenAddedToNudgeMigration ?? false;
-                const isInvitedOrGroupMember = (hasNonPersonalPolicy || wasInvitedToNewDot) ?? false;
+                const isInvitedOrGroupMember = (hasNonPersonalPolicy || wasInvitedToNewDot || hasJoinedWorkspace) ?? false;
                 if (isMigratedUser || isInvitedOrGroupMember || shouldSuppressPromotionalUI) {
                     return;
                 }
@@ -170,6 +198,9 @@ function useOnboardingFlowRouter() {
         hasBeenAddedToNudgeMigration,
         hasNonPersonalPolicy,
         wasInvitedToNewDot,
+        hasJoinedWorkspace,
+        isServerDataReady,
+        isOffline,
         isOnboardingCompleted,
         shouldSuppressPromotionalUI,
         getIsVisitingSecureLink,

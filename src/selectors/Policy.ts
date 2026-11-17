@@ -509,6 +509,22 @@ const hasOnlyPersonalPoliciesSelector = (policies: OnyxCollection<Policy>): bool
 };
 
 /**
+ * Whether the user holds a seat in a group workspace someone else owns, outside the one onboarding joined or set up.
+ * ReconnectApp delivers that workspace without refreshing HAS_NON_PERSONAL_POLICY, so the onboarding skip checks read the collection too.
+ * The user's own workspace and ONBOARDING_POLICY_ID are left out because onboarding still has steps to finish for them.
+ */
+const hasJoinedWorkspaceOutsideOnboarding = (policies: OnyxCollection<Policy>, currentUserAccountID: number | undefined, onboardingPolicyID: string | undefined): boolean =>
+    Object.values(policies ?? {}).some(
+        (policy) =>
+            isGroupPolicy(policy) &&
+            !!policy?.role &&
+            !policy.isJoinRequestPending &&
+            policy.ownerAccountID !== currentUserAccountID &&
+            policy.id !== onboardingPolicyID &&
+            !isPendingDeletePolicy(policy),
+    );
+
+/**
  * Returns the name of a workspace the member belongs to that calculates commuter exclusions from the member's
  * home address, so the private home address row can name the workspace relying on it.
  */
@@ -727,6 +743,7 @@ export {
     hasReusablePoliciesConnectedToSelector,
     lastWorkspaceNumberSelector,
     hasOnlyPersonalPoliciesSelector,
+    hasJoinedWorkspaceOutsideOnboarding,
     homeAndOfficeCommuterExclusionPolicyNameSelector,
     policyAvatarFieldsSelector,
     policyNameSelector,

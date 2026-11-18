@@ -106,6 +106,8 @@ function PDFPasswordForm({isFocused, isPasswordInvalid = false, shouldShowLoadin
     return shouldShowForm ? (
         <ScrollView
             keyboardShouldPersistTaps="handled"
+            // On iOS the attachment screen does not resize for the keyboard, so the form makes room for it here
+            automaticallyAdjustKeyboardInsets
             style={styles.getPDFPasswordFormStyle(shouldUseNarrowLayout)}
             contentContainerStyle={styles.p5}
         >

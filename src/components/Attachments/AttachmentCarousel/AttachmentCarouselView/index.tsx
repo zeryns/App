@@ -12,6 +12,7 @@ import {useFullScreenState} from '@components/VideoPlayerContexts/FullScreenCont
 import {useMemoizedLazyIllustrations} from '@hooks/useLazyAsset';
 import useLocalize from '@hooks/useLocalize';
 import useResponsiveLayout from '@hooks/useResponsiveLayout';
+import useSafeAreaPaddings from '@hooks/useSafeAreaPaddings';
 import useThemeStyles from '@hooks/useThemeStyles';
 import useWindowDimensions from '@hooks/useWindowDimensions';
 
@@ -82,12 +83,19 @@ function AttachmentCarouselView({
     const {shouldUseNarrowLayout} = useResponsiveLayout();
     const modalStyles = styles.centeredModalStyles(shouldUseNarrowLayout, true);
     const {windowWidth} = useWindowDimensions();
+    const {insets} = useSafeAreaPaddings();
 
-    const cellWidth = PixelRatio.roundToNearestPixel(windowWidth - (modalStyles.marginHorizontal + modalStyles.borderWidth) * 2);
+    // The modal pads its sides by the safe area insets, which are not zero in landscape on iPhones with a notch, so the cells leave them out to match the list width
+    const cellWidth = PixelRatio.roundToNearestPixel(windowWidth - (modalStyles.marginHorizontal + modalStyles.borderWidth) * 2 - insets.left - insets.right);
 
     /** Updates the page state when the user navigates between attachments */
     const updatePage = ({viewableItems}: UpdatePageProps) => {
         if (isFullScreenRef.current) {
+            return;
+        }
+
+        // Each cell is as wide as the list, so more than one fully visible item means the cells have not been resized to the new window width yet
+        if (viewableItems.length > 1) {
             return;
         }
 

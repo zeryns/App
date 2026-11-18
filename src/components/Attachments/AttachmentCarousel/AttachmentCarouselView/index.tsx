@@ -12,7 +12,6 @@ import {useFullScreenState} from '@components/VideoPlayerContexts/FullScreenCont
 import {useMemoizedLazyIllustrations} from '@hooks/useLazyAsset';
 import useLocalize from '@hooks/useLocalize';
 import useResponsiveLayout from '@hooks/useResponsiveLayout';
-import useSafeAreaPaddings from '@hooks/useSafeAreaPaddings';
 import useThemeStyles from '@hooks/useThemeStyles';
 import useWindowDimensions from '@hooks/useWindowDimensions';
 
@@ -25,7 +24,7 @@ import CONST from '@src/CONST';
 import type {ListRenderItemInfo} from 'react-native';
 import type {PanGesture} from 'react-native-gesture-handler';
 
-import React, {useEffect, useState} from 'react';
+import React, {useLayoutEffect, useRef, useState} from 'react';
 import {Keyboard, PixelRatio, View} from 'react-native';
 import {GestureDetector, usePanGesture} from 'react-native-gesture-handler';
 import Animated, {scrollTo, useAnimatedRef, useSharedValue} from 'react-native-reanimated';
@@ -83,22 +82,35 @@ function AttachmentCarouselView({
     const {shouldUseNarrowLayout} = useResponsiveLayout();
     const modalStyles = styles.centeredModalStyles(shouldUseNarrowLayout, true);
     const {windowWidth} = useWindowDimensions();
-    const {insets} = useSafeAreaPaddings();
+    const [listWidth, setListWidth] = useState<number>();
 
-    // The modal pads its sides by the safe area insets, which are not zero in landscape on iPhones with a notch, so the cells leave them out to match the list width
-    const cellWidth = PixelRatio.roundToNearestPixel(windowWidth - (modalStyles.marginHorizontal + modalStyles.borderWidth) * 2 - insets.left - insets.right);
+    // The cells take the width the list is laid out at, because the modal can pad the list by the safe area insets, which Safari updates at a different time than the window size.
+    // Until the list is laid out, we assume it fills the modal.
+    const cellWidth = listWidth ?? PixelRatio.roundToNearestPixel(windowWidth - (modalStyles.marginHorizontal + modalStyles.borderWidth) * 2);
+
+    // Safari resizes the list, then its cells, and then scrolls the list back to the page, at different times while the device rotates with the keyboard open.
+    // The list works out the visible items from the width and scroll position it last reported, so until it reports the page at the cells' width, those items are not the page the user is on.
+    const listLayoutRef = useRef({width: cellWidth, offset: 0});
+    const cellLayoutRef = useRef({width: cellWidth, pageOffset: 0, hasScrolledToPage: true});
+    const shownIndexRef = useRef<number | null>(null);
 
     /** Updates the page state when the user navigates between attachments */
     const updatePage = ({viewableItems}: UpdatePageProps) => {
-        if (isFullScreenRef.current) {
+        if (isFullScreenRef.current || listLayoutRef.current.width !== cellLayoutRef.current.width || !cellLayoutRef.current.hasScrolledToPage) {
             return;
         }
-
-        Keyboard.dismiss();
 
         // Since we can have only one item in view at a time, we can use the first item in the array
         // to get the index of the current page
         const entry = viewableItems.at(0);
+
+        // The list also reports the page it is already on after a resize, and the keyboard should only close when the user moves to another attachment
+        const shownIndex = entry?.index ?? null;
+        if (shownIndex !== shownIndexRef.current) {
+            Keyboard.dismiss();
+        }
+        shownIndexRef.current = shownIndex;
+
         if (!entry) {
             setActiveAttachmentID(null);
             return;
@@ -208,8 +220,10 @@ function AttachmentCarouselView({
         </View>
     );
 
-    // Scroll position is affected when window width is resized, so we readjust it on width changes
-    useEffect(() => {
+    // Scroll position is affected when the list is resized, so we readjust it on width changes
+    useLayoutEffect(() => {
+        const pageOffset = page * cellWidth;
+        cellLayoutRef.current = {width: cellWidth, pageOffset, hasScrolledToPage: Math.abs(listLayoutRef.current.offset - pageOffset) < 1};
         if (attachments.length === 0 || scrollRef.current == null) {
             return;
         }
@@ -266,6 +280,17 @@ function AttachmentCarouselView({
                                     keyExtractor={extractItemKey}
                                     viewabilityConfig={viewabilityConfig}
                                     onViewableItemsChanged={updatePage}
+                                    onLayout={(event) => {
+                                        listLayoutRef.current.width = event.nativeEvent.layout.width;
+                                        setListWidth(event.nativeEvent.layout.width);
+                                    }}
+                                    onScroll={(event) => {
+                                        const {layoutMeasurement, contentOffset} = event.nativeEvent;
+                                        listLayoutRef.current = {width: layoutMeasurement.width, offset: contentOffset.x};
+                                        if (Math.abs(contentOffset.x - cellLayoutRef.current.pageOffset) < 1) {
+                                            cellLayoutRef.current.hasScrolledToPage = true;
+                                        }
+                                    }}
                                 />
                             </DeviceAwareGestureDetector>
                         </AttachmentCarouselPagerActionsContext.Provider>

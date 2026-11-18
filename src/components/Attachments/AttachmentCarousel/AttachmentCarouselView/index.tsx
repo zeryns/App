@@ -94,11 +94,6 @@ function AttachmentCarouselView({
             return;
         }
 
-        // Each cell is as wide as the list, so more than one fully visible item means the cells have not been resized to the new window width yet
-        if (viewableItems.length > 1) {
-            return;
-        }
-
         Keyboard.dismiss();
 
         // Since we can have only one item in view at a time, we can use the first item in the array

@@ -91,8 +91,8 @@ function AttachmentCarouselView({
     // Safari resizes the list, then its cells, and then scrolls the list back to the page, at different times while the device rotates with the keyboard open.
     // The list works out the visible items from the width and scroll position it last reported, so until it reports the page at the cells' width, those items are not the page the user is on.
     const listLayoutRef = useRef({width: cellWidth, offset: 0});
-    const cellLayoutRef = useRef({width: cellWidth, pageOffset: 0, hasScrolledToPage: true});
-    const shownIndexRef = useRef<number | null>(null);
+    const cellLayoutRef = useRef({width: cellWidth, hasScrolledToPage: true});
+    const shownAttachmentRef = useRef<Attachment | null>(null);
 
     /** Updates the page state when the user navigates between attachments */
     const updatePage = ({viewableItems}: UpdatePageProps) => {
@@ -104,12 +104,15 @@ function AttachmentCarouselView({
         // to get the index of the current page
         const entry = viewableItems.at(0);
 
-        // The list also reports the page it is already on after a resize, and the keyboard should only close when the user moves to another attachment
-        const shownIndex = entry?.index ?? null;
-        if (shownIndex !== shownIndexRef.current) {
-            Keyboard.dismiss();
+        // After a resize the list reports the attachment it already shows again. Navigating to it again would close the keyboard
+        // and clear the text selection, which leaves a focused password field that can't be typed in.
+        const shownAttachment = entry?.item ?? null;
+        if (shownAttachment === shownAttachmentRef.current) {
+            return;
         }
-        shownIndexRef.current = shownIndex;
+        shownAttachmentRef.current = shownAttachment;
+
+        Keyboard.dismiss();
 
         if (!entry) {
             setActiveAttachmentID(null);
@@ -222,12 +225,13 @@ function AttachmentCarouselView({
 
     // Scroll position is affected when the list is resized, so we readjust it on width changes
     useLayoutEffect(() => {
-        const pageOffset = page * cellWidth;
-        cellLayoutRef.current = {width: cellWidth, pageOffset, hasScrolledToPage: Math.abs(listLayoutRef.current.offset - pageOffset) < 1};
+        cellLayoutRef.current = {width: cellWidth, hasScrolledToPage: true};
         if (attachments.length === 0 || scrollRef.current == null) {
             return;
         }
 
+        // The list only learns the new scroll position from its next scroll event, unless it is already there
+        cellLayoutRef.current.hasScrolledToPage = Math.abs(listLayoutRef.current.offset - page * cellWidth) < 1;
         scrollRef.current.scrollToIndex({index: page, animated: false});
         // The hook is not supposed to run on page change, so we keep the page out of the dependencies
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -287,9 +291,7 @@ function AttachmentCarouselView({
                                     onScroll={(event) => {
                                         const {layoutMeasurement, contentOffset} = event.nativeEvent;
                                         listLayoutRef.current = {width: layoutMeasurement.width, offset: contentOffset.x};
-                                        if (Math.abs(contentOffset.x - cellLayoutRef.current.pageOffset) < 1) {
-                                            cellLayoutRef.current.hasScrolledToPage = true;
-                                        }
+                                        cellLayoutRef.current.hasScrolledToPage = true;
                                     }}
                                 />
                             </DeviceAwareGestureDetector>

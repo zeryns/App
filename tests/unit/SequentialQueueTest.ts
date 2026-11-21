@@ -1,4 +1,4 @@
-import {resolveOpenAppDuplicationConflictAction, resolveReconnectDuplicationConflictAction} from '@libs/actions/RequestConflictUtils';
+import {resolveOpenAppDuplicationConflictAction, resolveReconnectDuplicationConflictAction, resolveReplaceReceiptConflicts} from '@libs/actions/RequestConflictUtils';
 import {isClientTheLeader} from '@libs/ActiveClientManager';
 import type {WriteCommand} from '@libs/API/types';
 import {WRITE_COMMANDS} from '@libs/API/types';
@@ -163,6 +163,33 @@ describe('SequentialQueue', () => {
         }
     });
 
+    it('should keep the latest replacement after its dependencies and before an immediately queued detach', async () => {
+        SequentialQueue.pause();
+        try {
+            // Given an upload followed by the request that opens its transaction thread
+            await SequentialQueue.push({command: WRITE_COMMANDS.REPLACE_RECEIPT, data: {transactionID: '1', receiptState: 'first'}});
+            await SequentialQueue.push({command: WRITE_COMMANDS.OPEN_REPORT, data: {reportID: '2'}});
+
+            // When a new upload supersedes it and a detach is queued without waiting for persistence
+            const replacementPush = SequentialQueue.push({
+                command: WRITE_COMMANDS.REPLACE_RECEIPT,
+                data: {transactionID: '1', receiptState: 'latest'},
+                checkAndFixConflictingRequest: (persistedRequests) => resolveReplaceReceiptConflicts(persistedRequests, '1'),
+            });
+            const detachPush = SequentialQueue.push({command: WRITE_COMMANDS.DETACH_RECEIPT, data: {transactionID: '1'}});
+            await Promise.all([replacementPush, detachPush]);
+
+            // Then the dependency precedes the surviving upload, and the final detach cannot be overtaken
+            expect(getAll().map((queuedRequest) => [queuedRequest.command, queuedRequest.data?.receiptState])).toEqual([
+                [WRITE_COMMANDS.OPEN_REPORT, undefined],
+                [WRITE_COMMANDS.REPLACE_RECEIPT, 'latest'],
+                [WRITE_COMMANDS.DETACH_RECEIPT, undefined],
+            ]);
+        } finally {
+            SequentialQueue.unpause();
+        }
+    });
+
     it('should push two requests with conflict resolution and push', () => {
         SequentialQueue.push(request);
         const requestWithConflictResolution: Request<never> = {
@@ -216,6 +243,31 @@ describe('SequentialQueue', () => {
 
             // The new request is in the persisted queue with the expected accountID.
             expect(getAll().some((r) => r.data?.accountID === 56789)).toBe(true);
+        } finally {
+            await mockFetch.resume();
+        }
+    });
+
+    it('keeps an ongoing receipt upload while collapsing only waiting replacements', async () => {
+        // Given an upload that may already have reached the server
+        mockFetch.pause();
+        try {
+            await SequentialQueue.push({command: WRITE_COMMANDS.REPLACE_RECEIPT, data: {transactionID: '1', receiptState: 'ongoing'}});
+            await waitForBatchedUpdates();
+            expect(getOngoingRequest()?.data?.receiptState).toBe('ongoing');
+
+            // When two newer receipt uploads are queued while it is in flight
+            for (const receiptState of ['waiting', 'latest']) {
+                await SequentialQueue.push({
+                    command: WRITE_COMMANDS.REPLACE_RECEIPT,
+                    data: {transactionID: '1', receiptState},
+                    checkAndFixConflictingRequest: (persistedRequests) => resolveReplaceReceiptConflicts(persistedRequests, '1'),
+                });
+            }
+
+            // Then the ongoing request survives and only the latest waiting file remains
+            expect(getOngoingRequest()?.data?.receiptState).toBe('ongoing');
+            expect(getAll()).toEqual([expect.objectContaining({data: expect.objectContaining({receiptState: 'latest'})})]);
         } finally {
             await mockFetch.resume();
         }
@@ -483,6 +535,38 @@ describe('SequentialQueue', () => {
             expect(SequentialQueue.sequentialQueueRequestThrottle.getLastRequestWaitTime()).toBe(0);
         } finally {
             offlineSpy.mockRestore();
+        }
+    });
+
+    it('keeps and sends a write the leader queued when a follower tab writes back a stale copy of the queue', async () => {
+        // Given a leader with a paused queue holding two requests and a newer approval
+        const processSpy = jest.spyOn(RequestModule, 'processWithMiddleware').mockResolvedValue({jsonCode: CONST.JSON_CODE.SUCCESS});
+        const readNewestAction: AnyRequest = {command: WRITE_COMMANDS.READ_NEWEST_ACTION, requestIndex: 1};
+        const openReport: AnyRequest = {command: WRITE_COMMANDS.OPEN_REPORT, requestIndex: 2};
+        const approveMoneyRequest: AnyRequest = {command: WRITE_COMMANDS.APPROVE_MONEY_REQUEST, requestIndex: 3};
+
+        try {
+            SequentialQueue.pause();
+            await SequentialQueue.push(readNewestAction);
+            await SequentialQueue.push(openReport);
+            await SequentialQueue.push(approveMoneyRequest);
+            await waitForBatchedUpdates();
+
+            // When a follower tab's copy of the queue, saved before the approval, lands in shared storage
+            await Onyx.set(ONYXKEYS.PERSISTED_REQUESTS, [readNewestAction, openReport]);
+            await waitForBatchedUpdates();
+
+            // Then the leader still sends the approval once the queue resumes
+            SequentialQueue.unpause();
+            await SequentialQueue.waitForIdle();
+            await waitForBatchedUpdates();
+            expect(processSpy.mock.calls.map(([sentRequest]) => sentRequest.command)).toEqual([
+                WRITE_COMMANDS.READ_NEWEST_ACTION,
+                WRITE_COMMANDS.OPEN_REPORT,
+                WRITE_COMMANDS.APPROVE_MONEY_REQUEST,
+            ]);
+        } finally {
+            processSpy.mockRestore();
         }
     });
 });

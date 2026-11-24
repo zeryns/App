@@ -11,11 +11,11 @@ import {useMemoizedLazyExpensifyIcons} from '@hooks/useLazyAsset';
 import useLocalize from '@hooks/useLocalize';
 import useNetwork from '@hooks/useNetwork';
 import useOnyx from '@hooks/useOnyx';
+import useRunAfterTransitions from '@hooks/useRunAfterTransitions';
 import useThemeStyles from '@hooks/useThemeStyles';
 import useThrottledButtonState from '@hooks/useThrottledButtonState';
 
 import Clipboard from '@libs/Clipboard';
-import deferNavigate from '@libs/Navigation/deferNavigate';
 import Navigation from '@libs/Navigation/Navigation';
 
 import CONST from '@src/CONST';
@@ -65,6 +65,7 @@ function TravelCVVPage() {
     );
 
     const isSignedInAsDelegate = !!account?.delegatedAccess?.delegate || false;
+    const isOpenTransitionDone = useRunAfterTransitions(true);
     const isVerifyAccountInStack = useNavigationState((state) => state.routes.some((route) => route.name === SCREENS.SETTINGS.WALLET.TRAVEL_CVV_VERIFY_ACCOUNT));
 
     // Auto-navigate to the validateCode screen on first mount so the user
@@ -95,12 +96,12 @@ function TravelCVVPage() {
         // connectivity or the account is unlocked). By leaving the ref unset, the
         // effect will re-run and auto-navigate once the blocking condition clears,
         // rather than permanently giving up and forcing the user to tap "Reveal Details".
-        if (isOffline || isAccountLocked) {
+        if (isOffline || isAccountLocked || !isOpenTransitionDone) {
             return;
         }
         setHasAutoNavigated(true);
-        deferNavigate(() => Navigation.navigate(ROUTES.SETTINGS_WALLET_TRAVEL_CVV_VERIFY_ACCOUNT));
-    }, [cvv, isSignedInAsDelegate, isOffline, isAccountLocked, isVerifyAccountInStack, hasAutoNavigated, setHasAutoNavigated]);
+        Navigation.navigate(ROUTES.SETTINGS_WALLET_TRAVEL_CVV_VERIFY_ACCOUNT);
+    }, [cvv, isSignedInAsDelegate, isOffline, isAccountLocked, isVerifyAccountInStack, hasAutoNavigated, setHasAutoNavigated, isOpenTransitionDone]);
 
     const handleRevealDetailsPress = () => {
         if (isAccountLocked) {

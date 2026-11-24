@@ -19,17 +19,20 @@ function TravelCVVContextProvider({children}: PropsWithChildren) {
     const [cvv, setCvv] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [validateError, setValidateError] = useState<Errors>({});
+    const [hasAutoNavigated, setHasAutoNavigated] = useState(false);
 
     const stateValue: TravelCVVStateContextType = {
         cvv,
         isLoading,
         validateError,
+        hasAutoNavigated,
     };
 
     const actionsValue: TravelCVVActionsContextType = {
         setCvv,
         setIsLoading,
         setValidateError,
+        setHasAutoNavigated,
     };
 
     return (

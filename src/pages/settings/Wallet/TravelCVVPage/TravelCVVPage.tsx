@@ -15,6 +15,7 @@ import useThemeStyles from '@hooks/useThemeStyles';
 import useThrottledButtonState from '@hooks/useThrottledButtonState';
 
 import Clipboard from '@libs/Clipboard';
+import deferNavigate from '@libs/Navigation/deferNavigate';
 import Navigation from '@libs/Navigation/Navigation';
 
 import CONST from '@src/CONST';
@@ -23,7 +24,7 @@ import ROUTES from '@src/ROUTES';
 import SCREENS from '@src/SCREENS';
 
 import {useNavigationState} from '@react-navigation/native';
-import React, {useEffect, useRef} from 'react';
+import React, {useEffect} from 'react';
 import {View} from 'react-native';
 
 import {useTravelCVVActions, useTravelCVVState} from './TravelCVVContextProvider';
@@ -45,8 +46,8 @@ function TravelCVVPage() {
     const {showLockedAccountModal} = useLockedAccountActions();
 
     // Get CVV from context - shared with TravelCVVVerifyAccountPage
-    const {cvv} = useTravelCVVState();
-    const {setCvv} = useTravelCVVActions();
+    const {cvv, hasAutoNavigated} = useTravelCVVState();
+    const {setCvv, setHasAutoNavigated} = useTravelCVVActions();
     const hasRevealedCVV = !!cvv;
 
     const CVV_LENGTH = cvv?.length ?? 3;
@@ -55,16 +56,21 @@ function TravelCVVPage() {
 
     // Clear CVV when the page unmounts (e.g. backdrop close) so it doesn't
     // remain visible the next time the page is opened
-    useEffect(() => () => setCvv(null), [setCvv]);
+    useEffect(
+        () => () => {
+            setCvv(null);
+            setHasAutoNavigated(false);
+        },
+        [setCvv, setHasAutoNavigated],
+    );
 
     const isSignedInAsDelegate = !!account?.delegatedAccess?.delegate || false;
     const isVerifyAccountInStack = useNavigationState((state) => state.routes.some((route) => route.name === SCREENS.SETTINGS.WALLET.TRAVEL_CVV_VERIFY_ACCOUNT));
 
     // Auto-navigate to the validateCode screen on first mount so the user
     // doesn't have to click "Reveal Details" manually.
-    const hasAutoNavigatedRef = useRef(false);
     useEffect(() => {
-        if (hasAutoNavigatedRef.current) {
+        if (hasAutoNavigated) {
             return;
         }
         // If the verify-account (validateCode) screen is already in the navigation
@@ -72,7 +78,7 @@ function TravelCVVPage() {
         // they completed or cancelled the validateCode flow and returned here).
         // Skip auto-navigation so we don't push a duplicate screen.
         if (isVerifyAccountInStack) {
-            hasAutoNavigatedRef.current = true;
+            setHasAutoNavigated(true);
             return;
         }
         // Permanent conditions — set the ref so we never retry auto-navigation.
@@ -81,7 +87,7 @@ function TravelCVVPage() {
         // transient guards below (offline / locked), these won't change during
         // this mount, so we mark the ref to stop future effect re-runs.
         if (cvv || isSignedInAsDelegate) {
-            hasAutoNavigatedRef.current = true;
+            setHasAutoNavigated(true);
             return;
         }
         // Transient conditions — we intentionally do NOT set hasAutoNavigatedRef here.
@@ -92,9 +98,9 @@ function TravelCVVPage() {
         if (isOffline || isAccountLocked) {
             return;
         }
-        hasAutoNavigatedRef.current = true;
-        Navigation.navigate(ROUTES.SETTINGS_WALLET_TRAVEL_CVV_VERIFY_ACCOUNT);
-    }, [cvv, isSignedInAsDelegate, isOffline, isAccountLocked, isVerifyAccountInStack]);
+        setHasAutoNavigated(true);
+        deferNavigate(() => Navigation.navigate(ROUTES.SETTINGS_WALLET_TRAVEL_CVV_VERIFY_ACCOUNT));
+    }, [cvv, isSignedInAsDelegate, isOffline, isAccountLocked, isVerifyAccountInStack, hasAutoNavigated, setHasAutoNavigated]);
 
     const handleRevealDetailsPress = () => {
         if (isAccountLocked) {

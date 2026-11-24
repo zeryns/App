@@ -28,12 +28,13 @@ function TravelCVVVerifyAccountPage() {
     const [cardList] = useOnyx(ONYXKEYS.CARD_LIST);
 
     const {isLoading, validateError} = useTravelCVVState();
-    const {setCvv, setIsLoading, setValidateError} = useTravelCVVActions();
+    const {setCvv, setIsLoading, setValidateError, setHasAutoNavigated} = useTravelCVVActions();
 
     const primaryLogin = usePrimaryContactMethod();
     const travelCard = getTravelBillingCard(cardList);
 
     const navigateBack = () => {
+        setHasAutoNavigated(true);
         Navigation.goBack(ROUTES.SETTINGS_WALLET_TRAVEL_CVV);
     };
 

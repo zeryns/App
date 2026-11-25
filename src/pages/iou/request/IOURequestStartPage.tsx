@@ -44,6 +44,7 @@ import type {TupleToUnion} from 'type-fest';
 import React, {useEffect, useRef, useState} from 'react';
 import {View} from 'react-native';
 
+import type {IOURequestStepPerDiemWorkspaceRef} from './step/IOURequestStepPerDiemWorkspace';
 import type {WithWritableReportOrNotFoundProps} from './step/withWritableReportOrNotFound';
 
 import DynamicIOURequestStepDestination from './step/DynamicIOURequestStepDestination';
@@ -96,6 +97,7 @@ function IOURequestStartPage({
     const [transaction, transactionResult] = useOnyx(`${ONYXKEYS.COLLECTION.TRANSACTION_DRAFT}${getNonEmptyStringOnyxID(route?.params.transactionID)}`);
     const isLoadingTransaction = isLoadingOnyxValue(transactionResult);
     const perDiemInputRef = useRef<AnimatedTextInputRef | null>(null);
+    const perDiemWorkspaceRef = useRef<IOURequestStepPerDiemWorkspaceRef | null>(null);
     const currentUserPersonalDetails = useCurrentUserPersonalDetails();
     const [iouRequestStartPolicies] = useOnyx(ONYXKEYS.COLLECTION.POLICY, {
         selector: createIOURequestStartPoliciesSelector(currentUserPersonalDetails.login, iouType === CONST.IOU.TYPE.INVOICE),
@@ -194,6 +196,10 @@ function IOURequestStartPage({
     }, []);
 
     const navigateBack = () => {
+        if (transactionRequestType === CONST.IOU.REQUEST_TYPE.PER_DIEM && perDiemWorkspaceRef.current?.cancelPendingSelection()) {
+            return;
+        }
+
         // The confirmation is embedded with its header hidden,
         // so this back button is the only way to abandon the flow. Cancel any active span
         // unconditionally (mirrors IOURequestStepConfirmation.navigateBack). No-op when no
@@ -358,6 +364,7 @@ function IOURequestStartPage({
                                                 <TabScreenWithFocusTrapWrapper>
                                                     {shouldShowWorkspaceSelectForPerDiem ? (
                                                         <IOURequestStepPerDiemWorkspace
+                                                            ref={perDiemWorkspaceRef}
                                                             route={route}
                                                             navigation={navigation}
                                                         />

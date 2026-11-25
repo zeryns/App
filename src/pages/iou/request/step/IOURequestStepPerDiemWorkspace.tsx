@@ -24,9 +24,10 @@ import ROUTES, {DYNAMIC_ROUTES} from '@src/ROUTES';
 import type SCREENS from '@src/SCREENS';
 import type {Policy} from '@src/types/onyx';
 
+import type {ForwardedRef} from 'react';
 import type {OnyxEntry} from 'react-native-onyx';
 
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useImperativeHandle, useState} from 'react';
 import {View} from 'react-native';
 
 import type {WithFullTransactionOrNotFoundProps} from './withFullTransactionOrNotFound';
@@ -34,9 +35,15 @@ import type {WithFullTransactionOrNotFoundProps} from './withFullTransactionOrNo
 import BaseRequestStepWorkspace from './BaseRequestStepWorkspace';
 import withFullTransactionOrNotFound from './withFullTransactionOrNotFound';
 
-type IOURequestStepPerDiemWorkspaceProps = WithFullTransactionOrNotFoundProps<typeof SCREENS.MONEY_REQUEST.CREATE>;
+type IOURequestStepPerDiemWorkspaceRef = {
+    cancelPendingSelection: () => boolean;
+};
 
-function IOURequestStepPerDiemWorkspace({route, navigation, transaction}: IOURequestStepPerDiemWorkspaceProps) {
+type IOURequestStepPerDiemWorkspaceProps = WithFullTransactionOrNotFoundProps<typeof SCREENS.MONEY_REQUEST.CREATE> & {
+    ref?: ForwardedRef<IOURequestStepPerDiemWorkspaceRef>;
+};
+
+function IOURequestStepPerDiemWorkspace({route, navigation, transaction, ref}: IOURequestStepPerDiemWorkspaceProps) {
     const styles = useThemeStyles();
     const {
         params: {action, iouType, transactionID},
@@ -48,6 +55,16 @@ function IOURequestStepPerDiemWorkspace({route, navigation, transaction}: IOUReq
     const {isOffline} = useNetwork();
     const [pendingPolicyID, setPendingPolicyID] = useState<string>();
     const [pendingPolicy] = useOnyx(`${ONYXKEYS.COLLECTION.POLICY}${pendingPolicyID}`);
+
+    useImperativeHandle(ref, () => ({
+        cancelPendingSelection: () => {
+            if (!pendingPolicyID) {
+                return false;
+            }
+            setPendingPolicyID(undefined);
+            return true;
+        },
+    }));
 
     const selectWorkspace = (policy: OnyxEntry<Policy>) => {
         const {targetReport, targetIouType, transactionReportID} = getInitialPerDiemTargetReport(
@@ -64,12 +81,10 @@ function IOURequestStepPerDiemWorkspace({route, navigation, transaction}: IOUReq
         }
 
         const perDiemUnit = getPerDiemCustomUnit(policy);
-        if (!perDiemUnit && policy?.id) {
-            fetchPerDiemRates(policy.id);
-        }
-
-        const canDestinationResolvePolicy = !!perDiemUnit || (!!targetReport.policyID && targetReport.policyID !== CONST.POLICY.ID_FAKE);
-        if (!canDestinationResolvePolicy) {
+        if (!perDiemUnit?.rates) {
+            if (policy?.id) {
+                fetchPerDiemRates(policy.id);
+            }
             setPendingPolicyID(policy?.id);
             return;
         }
@@ -98,13 +113,21 @@ function IOURequestStepPerDiemWorkspace({route, navigation, transaction}: IOUReq
     };
 
     useEffect(() => {
-        if (!pendingPolicyID || !getPerDiemCustomUnit(pendingPolicy)) {
+        if (!pendingPolicyID || !getPerDiemCustomUnit(pendingPolicy)?.rates) {
             return;
         }
         const frame = requestAnimationFrame(() => selectWorkspace(pendingPolicy));
         return () => cancelAnimationFrame(frame);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pendingPolicy, pendingPolicyID]);
+
+    useEffect(() => {
+        if (isOffline || !pendingPolicyID || getPerDiemCustomUnit(pendingPolicy)?.rates) {
+            return;
+        }
+        fetchPerDiemRates(pendingPolicyID);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOffline]);
 
     if (pendingPolicyID) {
         if (isOffline) {
@@ -128,3 +151,4 @@ function IOURequestStepPerDiemWorkspace({route, navigation, transaction}: IOUReq
 }
 
 export default withFullTransactionOrNotFound(IOURequestStepPerDiemWorkspace);
+export type {IOURequestStepPerDiemWorkspaceRef};

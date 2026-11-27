@@ -163,7 +163,7 @@ function ParentNavigationSubtitle({
                 if (currentFocusedNavigator?.name === NAVIGATORS.RIGHT_MODAL_NAVIGATOR && currentReportIndex && currentReportIndex > 0) {
                     const previousRoute = focusedNavigatorState.routes[currentReportIndex - 1];
 
-                    if (previousRoute?.name === SCREENS.RIGHT_MODAL.SEARCH_MONEY_REQUEST_REPORT) {
+                    if (previousRoute?.name === SCREENS.RIGHT_MODAL.SEARCH_MONEY_REQUEST_REPORT || previousRoute?.name === SCREENS.RIGHT_MODAL.SEARCH_REPORT) {
                         const moneyRequestReportID = (previousRoute?.params as RightModalNavigatorParamList[typeof SCREENS.RIGHT_MODAL.SEARCH_MONEY_REQUEST_REPORT])?.reportID;
                         if (moneyRequestReportID === parentReportID) {
                             Navigation.goBack();

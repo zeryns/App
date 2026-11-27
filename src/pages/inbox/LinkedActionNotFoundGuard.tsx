@@ -1,4 +1,5 @@
 import useCurrentUserPersonalDetails from '@hooks/useCurrentUserPersonalDetails';
+import useOneTransactionThreadReportAction from '@hooks/useOneTransactionThreadReportAction';
 import useOnyx from '@hooks/useOnyx';
 import useReportIsArchived from '@hooks/useReportIsArchived';
 
@@ -62,9 +63,11 @@ function LinkedActionNotFoundGate({reportActionIDFromRoute}: LinkedActionNotFoun
     const [isLoadingInitialReportActions = true] = useOnyx(`${ONYXKEYS.COLLECTION.RAM_ONLY_REPORT_LOADING_STATE}${reportIDFromRoute}`, {
         selector: isLoadingInitialReportActionsSelector,
     });
-    const [linkedAction] = useOnyx(`${ONYXKEYS.COLLECTION.REPORT_ACTIONS}${reportIDFromRoute}`, {
+    const [reportLinkedAction] = useOnyx(`${ONYXKEYS.COLLECTION.REPORT_ACTIONS}${reportIDFromRoute}`, {
         selector: (actions: OnyxEntry<ReportActions>) => getReportActionByIDSelector(actions, reportActionIDFromRoute),
     });
+    const oneTransactionThreadLinkedAction = useOneTransactionThreadReportAction(reportIDFromRoute, reportActionIDFromRoute);
+    const linkedAction = reportLinkedAction ?? oneTransactionThreadLinkedAction;
     const [visibleReportActionsData] = useOnyx(ONYXKEYS.DERIVED.VISIBLE_REPORT_ACTIONS);
 
     const isReportArchived = useReportIsArchived(reportIDFromRoute);

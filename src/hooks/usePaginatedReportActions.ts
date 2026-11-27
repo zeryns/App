@@ -11,6 +11,7 @@ import type {OnyxEntry} from 'react-native-onyx';
 import {useState} from 'react';
 
 import useInitial from './useInitial';
+import useOneTransactionThreadReportAction from './useOneTransactionThreadReportAction';
 import useOnyx from './useOnyx';
 import useReportIsArchived from './useReportIsArchived';
 
@@ -50,6 +51,9 @@ function usePaginatedReportActions(reportID: string | undefined, reportActionID?
     });
     const [reportActionPages] = useOnyx(`${ONYXKEYS.COLLECTION.REPORT_ACTIONS_PAGES}${nonEmptyStringReportID}`);
 
+    // A comment of the one-transaction thread isn't in this report's pages, so anchoring on it would return an empty list.
+    const linkedOneTransactionThreadAction = useOneTransactionThreadReportAction(reportID, reportActionID);
+
     // Default (regular inbox chats): snapshot lastReadTime at first render.
     const [firstRenderLastReadTime] = useState(report?.lastReadTime);
     // Concierge only: snapshot the first non-undefined lastReadTime. On a cold open the report can be
@@ -58,7 +62,7 @@ function usePaginatedReportActions(reportID: string | undefined, reportActionID?
     const firstDefinedLastReadTime = useInitial(report?.lastReadTime);
 
     const getPaginationAnchorID = () => {
-        if (treatAsNoPaginationAnchor) {
+        if (treatAsNoPaginationAnchor || !!linkedOneTransactionThreadAction) {
             return undefined;
         }
 

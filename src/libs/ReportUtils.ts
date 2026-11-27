@@ -12589,16 +12589,22 @@ function navigateToLinkedReportAction(
     isOffline: boolean,
     visibleReportActionsData?: VisibleReportActionsDerivedValue,
 ) {
-    if (isInNarrowPaneModal) {
-        const rootState = navigationRef.current?.getRootState();
-        const topmostRHP = rootState?.routes.findLast((route) => route.name === NAVIGATORS.RIGHT_MODAL_NAVIGATOR);
-        const rhpState = topmostRHP?.state;
-        const rhpIndex = rhpState?.index ?? (rhpState?.routes.length ? rhpState.routes.length - 1 : -1);
-        const routeBelow = rhpIndex > 0 ? rhpState?.routes.at(rhpIndex - 1) : undefined;
-        const routeBelowParams = routeBelow?.params as {reportID?: string} | undefined;
+    // A one-expense report shows its transaction thread's comments, so the screen below can be that report while the comment belongs to the thread.
+    const displayedReportID = getDisplayedReportID(ancestor.report.reportID, isOffline);
+    const oneExpenseReportID = displayedReportID !== ancestor.report.reportID && isOneTransactionReport(getReport(displayedReportID, deprecatedAllReports)) ? displayedReportID : undefined;
 
-        if (routeBelow?.key && routeBelowParams?.reportID === ancestor.report.reportID) {
-            Navigation.setParams({reportActionID: ancestor.reportAction.reportActionID}, routeBelow.key, rhpState?.key);
+    const rootState = navigationRef.current?.getRootState();
+    const stackState = isInNarrowPaneModal
+        ? rootState?.routes.findLast((route) => route.name === NAVIGATORS.RIGHT_MODAL_NAVIGATOR)?.state
+        : rootState?.routes.findLast((route) => route.name === NAVIGATORS.TAB_NAVIGATOR)?.state?.routes.findLast((route) => route.name === NAVIGATORS.REPORTS_SPLIT_NAVIGATOR)?.state;
+    const stackIndex = stackState?.index ?? (stackState?.routes.length ? stackState.routes.length - 1 : -1);
+    const routeBelow = stackIndex > 0 ? stackState?.routes.at(stackIndex - 1) : undefined;
+    const routeBelowReportID = (routeBelow?.params as {reportID?: string} | undefined)?.reportID;
+    const isOneExpenseReportBelow = !!oneExpenseReportID && routeBelowReportID === oneExpenseReportID;
+
+    if (isInNarrowPaneModal) {
+        if (routeBelow?.key && (routeBelowReportID === ancestor.report.reportID || isOneExpenseReportBelow)) {
+            Navigation.setParams({reportActionID: ancestor.reportAction.reportActionID}, routeBelow.key, stackState?.key);
             Navigation.goBack();
             return;
         }
@@ -12613,13 +12619,23 @@ function navigateToLinkedReportAction(
         return;
     }
 
+    const reportID = ancestor.report.reportID;
+    const isVisibleAction = !!reportID && isReportActionVisible(ancestor.reportAction, reportID, canUserPerformWrite, visibleReportActionsData);
+    const shouldLinkToAction = isVisibleAction && !isOffline;
+
+    // goBack(route) below misses this report because its route has a backTo, so it would replace the thread and show the expense twice.
+    if (routeBelow?.key && isOneExpenseReportBelow) {
+        if (shouldLinkToAction) {
+            Navigation.setParams({reportActionID: ancestor.reportAction.reportActionID}, routeBelow.key, stackState?.key);
+        }
+        Navigation.goBack();
+        return;
+    }
+
     // Pop the thread report screen before navigating to the chat report.
     Navigation.goBack(ROUTES.REPORT_WITH_ID.getRoute(ancestor.report.reportID));
 
-    const reportID = ancestor.report.reportID;
-    const isVisibleAction = !!reportID && isReportActionVisible(ancestor.reportAction, reportID, canUserPerformWrite, visibleReportActionsData);
-
-    if (isVisibleAction && !isOffline) {
+    if (shouldLinkToAction) {
         // Pop the chat report screen before navigating to the linked report action.
         Navigation.goBack(ROUTES.REPORT_WITH_ID.getRoute(ancestor.report.reportID, ancestor.reportAction.reportActionID));
     }
